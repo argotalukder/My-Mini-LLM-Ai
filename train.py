@@ -37,8 +37,64 @@ def setup():
     os.makedirs("checkpoints", exist_ok=True)
     os.makedirs("tokenizer",   exist_ok=True)
     os.makedirs("logs",        exist_ok=True)
+    os.makedirs("data",        exist_ok=True)
 
     return config, device
+
+
+# ── HuggingFace Data Download ─────────────────────────────────
+
+def download_and_convert_hf_data(config):
+    """HuggingFace থেকে Bengali data download করো এবং আমাদের format এ convert করো"""
+
+    # আগে থেকে থাকলে skip করো
+    if os.path.exists(config.hf_data_file):
+        print("✅ HF data আগে থেকেই আছে! Download skip করছি...")
+        return
+
+    print("\n" + "="*50)
+    print("📥 HUGGINGFACE DATA DOWNLOAD")
+    print("="*50)
+
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        print("❌ datasets library নেই! চালাও: pip install datasets")
+        return
+
+    print("⏳ saillab/alpaca-bengali-cleaned download হচ্ছে...")
+    dataset = load_dataset("saillab/alpaca-bengali-cleaned")
+
+    count = 0
+    skipped = 0
+
+    with open(config.hf_data_file, 'w', encoding='utf-8') as f:
+        for split in ['train', 'test']:
+            print(f"   Processing {split} split...")
+            for row in dataset[split]:
+                user = row['instruction'].strip()
+
+                # input থাকলে instruction এর সাথে জুড়ে দাও
+                if row['input'] and str(row['input']).strip() not in ['', 'nan']:
+                    user = f"{user}\n{row['input'].strip()}"
+
+                ai = row['output'].strip()
+
+                # খুব ছোট বাদ দাও
+                if len(user) < 5 or len(ai) < 5:
+                    skipped += 1
+                    continue
+
+                # Model ছোট — খুব long output কাটো
+                if len(ai) > 400:
+                    ai = ai[:400]
+
+                item = {"user": user, "ai": ai}
+                f.write(json.dumps(item, ensure_ascii=False) + '\n')
+                count += 1
+
+    print(f"✅ {count} conversations saved → {config.hf_data_file}")
+    print(f"⚠️  {skipped} rows skipped (too short)")
 
 
 # ── Tokenizer Training ────────────────────────────────────────
@@ -244,9 +300,12 @@ def main():
     # Setup
     config, device = setup()
 
-    # Data load
+    # HuggingFace data download + convert (প্রথমবার হলে download হবে)
+    download_and_convert_hf_data(config)
+
+    # Data load — নিজের data + HF data একসাথে
     print("\n📂 Data loading...")
-    conversations = load_conversations(config.data_file)
+    conversations = load_conversations(config.data_file, config.hf_data_file)
 
     if len(conversations) == 0:
         print("❌ কোনো data নেই! data/conversations.jsonl check করো।")
