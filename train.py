@@ -1,7 +1,7 @@
 # ============================================================
-#   train.py — Model Training
-#   Google Colab এ run করো (free GPU!)
-#   Team Claude AI | Made for Argo
+#    train.py — Model Training (Updated for Argo)
+#    Google Colab এ run করো (free GPU!)
+#    Team Claude AI | Made for Argo
 # ============================================================
 
 import os
@@ -59,7 +59,7 @@ def download_and_convert_hf_data(config):
     try:
         from datasets import load_dataset
     except ImportError:
-        print("❌ datasets library নেই! চালাও: pip install datasets")
+        print("❌ datasets library নেই! চালাও: !pip install datasets")
         return
 
     print("⏳ saillab/alpaca-bengali-cleaned download হচ্ছে...")
@@ -74,7 +74,7 @@ def download_and_convert_hf_data(config):
             for row in dataset[split]:
                 user = row['instruction'].strip()
 
-                # input থাকলে instruction এর সাথে জুড়ে দাও
+                # input থাকলে instruction এর সাথে জুড়ে দাও
                 if row['input'] and str(row['input']).strip() not in ['', 'nan']:
                     user = f"{user}\n{row['input'].strip()}"
 
@@ -100,7 +100,7 @@ def download_and_convert_hf_data(config):
 # ── Tokenizer Training ────────────────────────────────────────
 
 def train_tokenizer(conversations, config):
-    """Tokenizer train করো conversation data দিয়ে"""
+    """Tokenizer train করো conversation data দিয়ে"""
     print("\n" + "="*50)
     print("📝 TOKENIZER TRAINING")
     print("="*50)
@@ -300,12 +300,18 @@ def main():
     # Setup
     config, device = setup()
 
-    # HuggingFace data download + convert (প্রথমবার হলে download হবে)
+    # HuggingFace data download + convert
     download_and_convert_hf_data(config)
 
     # Data load — নিজের data + HF data একসাথে
     print("\n📂 Data loading...")
-    conversations = load_conversations(config.data_file, config.hf_data_file)
+    
+    # Update: 'limit' parameter যোগ করা হয়েছে যাতে RAM ক্র্যাশ না করে
+    conversations = load_conversations(
+        config.data_file, 
+        config.hf_data_file, 
+        limit=10000  # আপাতত ১০ হাজার ডেটা দিয়ে ট্রেইন করা নিরাপদ
+    )
 
     if len(conversations) == 0:
         print("❌ কোনো data নেই! data/conversations.jsonl check করো।")
