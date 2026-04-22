@@ -1,7 +1,7 @@
 # ============================================================
-#   data/processor.py
-#   Training data load + process + batch বানানো
-#   Team Claude AI | Made for Argo
+#    data/processor.py
+#    Training data load + process + batch বানানো
+#    Team Claude AI | Made for Argo
 # ============================================================
 
 import os
@@ -10,23 +10,23 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import random
 
-
-def load_conversations(filepath, hf_filepath=None):
+def load_conversations(filepath, hf_filepath=None, limit=None):
     """JSONL file থেকে conversations load করো + HF data merge"""
     conversations = []
 
     # ── তোমার নিজের data ─────────────────────────────────────
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    item = json.loads(line)
-                    if 'user' in item and 'ai' in item:
-                        conversations.append(item)
-                except json.JSONDecodeError:
-                    continue
-    print(f"✅ নিজের data: {len(conversations)} conversations")
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        item = json.loads(line)
+                        if 'user' in item and 'ai' in item:
+                            conversations.append(item)
+                    except json.JSONDecodeError:
+                        continue
+        print(f"✅ নিজের data: {len(conversations)} conversations")
 
     # ── HuggingFace data (যদি থাকে) ──────────────────────────
     if hf_filepath and os.path.exists(hf_filepath):
@@ -44,13 +44,17 @@ def load_conversations(filepath, hf_filepath=None):
                         continue
         print(f"✅ HuggingFace data: {hf_count} conversations")
     else:
-        print("⚠️  HF data পাওয়া যায়নি, শুধু নিজের data দিয়ে train হবে।")
-
-    print(f"✅ মোট: {len(conversations)} conversations")
+        print("⚠️  HF data পাওয়া যায়নি, শুধু নিজের data দিয়ে train হবে।")
 
     # দুটো data ভালোভাবে mix করো
     random.shuffle(conversations)
 
+    # ── এখানে Data Limit সেট করা হচ্ছে ──
+    if limit and len(conversations) > limit:
+        conversations = conversations[:limit]
+        print(f"✂️  Data limited to: {limit} conversations for training.")
+
+    print(f"✅ মোট ট্রেইনিং ডেটা: {len(conversations)}")
     return conversations
 
 
@@ -58,7 +62,6 @@ class ConversationDataset(Dataset):
     """
     PyTorch Dataset for conversation training
     """
-
     def __init__(self, conversations, tokenizer, max_seq_len=128):
         self.tokenizer   = tokenizer
         self.max_seq_len = max_seq_len
